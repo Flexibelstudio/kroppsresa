@@ -1,12 +1,12 @@
-import { GoogleGenAI, Modality } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const API_KEY = process.env.API_KEY;
+const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
 if (!API_KEY) {
-  console.warn("API key for Gemini is not set. Please set the API_KEY environment variable.");
+  console.error("Gemini API key saknas, kolla .env");
 }
 
-const ai = new GoogleGenAI({ apiKey: API_KEY });
+const genAI = new GoogleGenerativeAI(API_KEY);
 
 function dataUrlToBlob(dataUrl: string): { mimeType: string, data: string } {
     const parts = dataUrl.split(',');

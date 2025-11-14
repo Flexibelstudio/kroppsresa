@@ -1,0 +1,5 @@
+{
+  "name": "Kroppsresa",
+  "description": "En webbapp som hjälper användare att visualisera sin kroppsförändring mot en målvikt eller önskad kroppssammansättning med hjälp av AI, baserat på indata och en uppladdad helkroppsbild. All data hanteras helt lokalt i webbläsaren.",
+  "requestFramePermissions": []
+}

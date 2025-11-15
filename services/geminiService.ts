@@ -1,13 +1,13 @@
 // services/geminiService.ts
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI, Modality } from "@google/genai";
 
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY as string;
+const API_KEY = process.env.API_KEY as string;
 
 if (!API_KEY) {
-  console.error("Gemini API key saknas, kolla .env (VITE_GEMINI_API_KEY).");
+  throw new Error("API key for Gemini is not set. Please set the API_KEY environment variable.");
 }
 
-const genAI = new GoogleGenerativeAI(API_KEY);
+const ai = new GoogleGenAI({apiKey: API_KEY});
 
 /**
  * Tar en data-URL (t.ex. "data:image/png;base64,...") och plockar ut mimeType + base64-data.
@@ -33,8 +33,6 @@ export async function generateGoalImage(
 ): Promise<string> {
   const { mimeType, data: base64ImageData } = dataUrlToInlineData(imageDataUrl);
 
-  // Använd samma modellnamn som du hade innan.
-  // Om den inte funkar: gå in i Google AI Studio och kolla vad modellen heter där.
   const modelName = "gemini-2.5-flash-image";
 
   const genderEnglish = gender === "kvinna" ? "woman" : "man";
@@ -89,21 +87,25 @@ ${criticalInstructions}`;
   }
 
   try {
-    // Skapa modell-instans via SDK:t
-    const model = genAI.getGenerativeModel({ model: modelName });
-
-    // Skicka in bild + prompt som content-delar
-    const result = await model.generateContent([
-      {
-        inlineData: {
-          data: base64ImageData,
-          mimeType,
+    const response = await ai.models.generateContent({
+        model: modelName,
+        contents: {
+            parts: [
+                {
+                    inlineData: {
+                        data: base64ImageData,
+                        mimeType,
+                    },
+                },
+                { text: prompt },
+            ]
         },
-      },
-      { text: prompt },
-    ]);
+        config: {
+            responseModalities: [Modality.IMAGE],
+        },
+    });
 
-    const candidates = result.response.candidates;
+    const candidates = response.candidates;
     const parts = candidates?.[0]?.content?.parts ?? [];
     const imagePart = parts.find((part: any) => part.inlineData);
 
@@ -112,7 +114,7 @@ ${criticalInstructions}`;
       const newMimeType = imagePart.inlineData.mimeType;
       return `data:${newMimeType};base64,${base64ImageBytes}`;
     } else {
-      console.error("Full Gemini Response:", JSON.stringify(result, null, 2));
+      console.error("Full Gemini Response:", JSON.stringify(response, null, 2));
       throw new Error(
         "No image data found in the AI response. The request might have been blocked."
       );

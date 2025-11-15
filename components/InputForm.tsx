@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { type UserData, type GoalData } from '../types';
 import { UploadIcon } from './icons';
@@ -13,6 +12,8 @@ interface InputFormProps {
   onClear: () => void;
   isGenerating: boolean;
   originalImage: string | null;
+  remainingGenerations: number;
+  isRateLimited: boolean;
 }
 
 const InputField: React.FC<{ label: string; unit: string; value: number; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; name: string; }> = ({ label, unit, value, onChange, name }) => {
@@ -39,7 +40,7 @@ const InputField: React.FC<{ label: string; unit: string; value: number; onChang
     );
 };
 
-const InputForm: React.FC<InputFormProps> = ({ data, goalData, setData, setGoalData, onImageUpload, onGenerate, onClear, isGenerating, originalImage }) => {
+const InputForm: React.FC<InputFormProps> = ({ data, goalData, setData, setGoalData, onImageUpload, onGenerate, onClear, isGenerating, originalImage, remainingGenerations, isRateLimited }) => {
   
   const handleUserChange = (e: React.ChangeEvent<HTMLInputElement | HTMLInputElement>) => {
     const { name, value, type } = e.target;
@@ -131,20 +132,33 @@ const InputForm: React.FC<InputFormProps> = ({ data, goalData, setData, setGoalD
         <input id="image-upload" type="file" accept="image/png, image/jpeg" className="hidden" onChange={handleFileChange} />
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-4 pt-4">
-        <button
-          onClick={onGenerate}
-          disabled={isGenerating}
-          className="w-full flex-grow text-white bg-primary hover:bg-primary-dark focus:ring-4 focus:outline-none focus:ring-teal-300 font-medium rounded-lg text-lg px-8 py-4 text-center transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-        >
-          {isGenerating ? 'Genererar...' : 'Generera målbild'}
-        </button>
-        <button
-          onClick={onClear}
-          className="w-full sm:w-auto text-gray-500 hover:text-gray-700 font-medium rounded-lg px-6 py-4 text-center transition-colors"
-        >
-          Rensa data
-        </button>
+      <div className="pt-4 space-y-4">
+        <div className="flex flex-col sm:flex-row gap-4">
+          <button
+            onClick={onGenerate}
+            disabled={isGenerating || isRateLimited}
+            className="w-full flex-grow text-white bg-primary hover:bg-primary-dark focus:ring-4 focus:outline-none focus:ring-teal-300 font-medium rounded-lg text-lg px-8 py-4 text-center transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+          >
+            {isGenerating ? 'Genererar...' : 'Generera målbild'}
+          </button>
+          <button
+            onClick={onClear}
+            className="w-full sm:w-auto text-gray-500 hover:text-gray-700 font-medium rounded-lg px-6 py-4 text-center transition-colors"
+          >
+            Rensa data
+          </button>
+        </div>
+        <div className="text-center text-sm text-gray-500">
+          {isRateLimited ? (
+            <p className="text-red-600 font-semibold">
+              Du har nått din dagliga gräns. Välkommen tillbaka imorgon!
+            </p>
+          ) : (
+            <p>
+              Du har <strong className="text-primary">{remainingGenerations}</strong> genereringar kvar idag.
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );

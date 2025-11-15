@@ -1,46 +1,16 @@
 // services/geminiService.ts
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// Försök hitta API-nyckeln på ett sätt som funkar i flera miljöer
-function resolveApiKey(): string | undefined {
-  try {
-    // Vite (browser + build)
-    // @ts-ignore - import.meta finns inte i alla miljöer
-    if (typeof import.meta !== "undefined" && import.meta.env?.VITE_GEMINI_API_KEY) {
-      // @ts-ignore
-      return import.meta.env.VITE_GEMINI_API_KEY as string;
-    }
-  } catch {
-    // ignorerar om import.meta inte finns
-  }
-
-  // Node / servermiljöer
-  if (typeof process !== "undefined" && (process as any).env?.VITE_GEMINI_API_KEY) {
-    return (process as any).env.VITE_GEMINI_API_KEY as string;
-  }
-  if (typeof process !== "undefined" && (process as any).env?.GEMINI_API_KEY) {
-    return (process as any).env.GEMINI_API_KEY as string;
-  }
-
-  // Fallback: global variabel (t.ex. om AI Studio/preview sätter den)
-  if (typeof globalThis !== "undefined" && (globalThis as any).GEMINI_API_KEY) {
-    return (globalThis as any).GEMINI_API_KEY as string;
-  }
-
-  return undefined;
-}
-
-const API_KEY = resolveApiKey();
+// Använd bara process.env här → Vite ersätter med sträng via vite.config.ts
+const API_KEY =
+  (typeof process !== "undefined" &&
+    ((process as any).env?.GEMINI_API_KEY ||
+      (process as any).env?.VITE_GEMINI_API_KEY)) ||
+  "";
 
 let genAI: GoogleGenerativeAI | null = null;
 if (API_KEY) {
   genAI = new GoogleGenerativeAI(API_KEY);
-} else {
-  console.warn(
-    "Gemini API key saknas. " +
-      "Sätt VITE_GEMINI_API_KEY (eller GEMINI_API_KEY) i din miljö. " +
-      "I AI Studio kan du t.ex. lägga den i en global variabel GEMINI_API_KEY."
-  );
 }
 
 /**
@@ -66,17 +36,16 @@ export async function generateGoalImage(
   currentWeight?: number
 ): Promise<string> {
   if (!genAI) {
-    // Kasta ett snyggt fel först när funktionen faktiskt används
+    // Kastas först när funktionen används – inte vid import
     throw new Error(
-      "Gemini API-nyckel är inte konfigurerad i den här miljön. " +
-        "Kontrollera att VITE_GEMINI_API_KEY (eller GEMINI_API_KEY / GEMINI_API_KEY globalt) är satt."
+      "Gemini API-nyckel saknas i den här miljön. " +
+        "Kontrollera att VITE_GEMINI_API_KEY / GEMINI_API_KEY är satt."
     );
   }
 
   const { mimeType, data: base64ImageData } = dataUrlToInlineData(imageDataUrl);
 
   const modelName = "gemini-2.5-flash-image";
-
   const genderEnglish = gender === "kvinna" ? "woman" : "man";
 
   let prompt: string;
@@ -132,7 +101,6 @@ ${criticalInstructions}`;
     const model = genAI.getGenerativeModel({
       model: modelName,
       generationConfig: {
-        // Vi vill ha bild tillbaka
         responseModalities: ["Image"],
       },
     });

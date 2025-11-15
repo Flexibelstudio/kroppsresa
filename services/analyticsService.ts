@@ -1,68 +1,114 @@
-import { initializeApp, type FirebaseApp } from 'firebase/app';
-import { getFirestore, collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { type UserData, type GoalData } from '../types';
+import { initializeApp, type FirebaseApp } from "firebase/app";
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  serverTimestamp,
+} from "firebase/firestore";
+import { type UserData, type GoalData } from "../types";
 
-// VIKTIGT: Dessa variabler måste finnas i er deploymentsmiljö (t.ex. Netlify, Vercel).
-// I AI Studio kommer de att vara odefinierade, och då är statistiken automatiskt avstängd.
+// Hjälpfunktion som försöker läsa env-variabler på flera sätt
+function getEnv(name: string): string | undefined {
+  // Vite (import.meta.env)
+  try {
+    // @ts-ignore
+    if (typeof import.meta !== "undefined" && import.meta.env) {
+      // @ts-ignore
+      const v = import.meta.env[name];
+      if (typeof v === "string" && v.length > 0) return v;
+    }
+  } catch {
+    // ignorera om import.meta inte finns (t.ex. i vissa verktyg)
+  }
+
+  // Node / build-miljöer (process.env)
+  if (typeof process !== "undefined" && (process as any).env) {
+    const v = (process as any).env[name];
+    if (typeof v === "string" && v.length > 0) return v;
+  }
+
+  return undefined;
+}
+
+// Försök först med VITE_* (Vites standard), därefter utan prefix
 const firebaseConfig = {
-  apiKey: process.env.FIREBASE_API_KEY,
-  authDomain: process.env.FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.FIREBASE_PROJECT_ID, // t.ex. "kroppsresa"
-  storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.FIREBASE_APP_ID,
+  apiKey:
+    getEnv("VITE_FIREBASE_API_KEY") || getEnv("FIREBASE_API_KEY") || undefined,
+  authDomain:
+    getEnv("VITE_FIREBASE_AUTH_DOMAIN") ||
+    getEnv("FIREBASE_AUTH_DOMAIN") ||
+    undefined,
+  projectId:
+    getEnv("VITE_FIREBASE_PROJECT_ID") ||
+    getEnv("FIREBASE_PROJECT_ID") ||
+    undefined,
+  storageBucket:
+    getEnv("VITE_FIREBASE_STORAGE_BUCKET") ||
+    getEnv("FIREBASE_STORAGE_BUCKET") ||
+    undefined,
+  messagingSenderId:
+    getEnv("VITE_FIREBASE_MESSAGING_SENDER_ID") ||
+    getEnv("FIREBASE_MESSAGING_SENDER_ID") ||
+    undefined,
+  appId:
+    getEnv("VITE_FIREBASE_APP_ID") || getEnv("FIREBASE_APP_ID") || undefined,
 };
 
 let app: FirebaseApp | null = null;
 let db: any = null;
 
-// Initiera Firebase endast om alla nödvändiga konfigurationsvärden finns
+// Initiera Firebase endast om apiKey & projectId finns
 if (firebaseConfig.apiKey && firebaseConfig.projectId) {
   try {
-    app = initializeApp(firebaseConfig);
+    app = initializeApp(firebaseConfig as any);
     db = getFirestore(app);
+    console.info(
+      `[Firebase] Initierad med projekt: ${firebaseConfig.projectId}`
+    );
   } catch (e) {
     console.error("Firebase-initiering misslyckades. Statistik är avstängd.", e);
-    db = null; // säkerställ att db är null vid fel
+    db = null;
   }
 } else {
-  // Detta är förväntat i AI Studio eller lokal utveckling utan en .env-fil
-  console.info("Firebase-konfiguration hittades inte. Statistik är avstängd.");
+  console.info(
+    "Firebase-konfiguration hittades inte (saknar apiKey eller projectId). Statistik är avstängd."
+  );
 }
 
 /**
  * Loggar en genereringshändelse till Firebase för statistiska ändamål.
- * Detta är en "fire-and-forget"-funktion. Den kommer inte att kasta fel
- * och kommer att misslyckas tyst om Firebase inte är konfigurerat.
- * @param userData Användarens indata.
- * @param goalData Användarens måldata.
+ * "Fire-and-forget": kastar inga fel utåt.
  */
-export const logGenerationEvent = (userData: UserData, goalData: GoalData): void => {
+export const logGenerationEvent = (
+  userData: UserData,
+  goalData: GoalData
+): void => {
   if (!db) {
-    return; // Avsluta tyst om Firebase inte är initierat
+    // Ingen databas → gör inget
+    return;
   }
 
-  // Skapa en ren kopia av data för att säkerställa att vi inte skickar något extra.
   const dataToLog = {
     userData: {
-        height: userData.height || 0,
-        weight: userData.weight || 0,
-        bodyFat: userData.bodyFat || 0,
-        muscleMass: userData.muscleMass || 0,
-        gender: userData.gender || 'unknown',
-        age: userData.age || 0,
+      height: userData.height || 0,
+      weight: userData.weight || 0,
+      bodyFat: userData.bodyFat || 0,
+      muscleMass: userData.muscleMass || 0,
+      gender: userData.gender || "unknown",
+      age: userData.age || 0,
     },
     goalData: {
-        goalWeight: goalData.goalWeight || 0,
-        goalBodyFat: goalData.goalBodyFat || 0,
-        goalMuscleMass: goalData.goalMuscleMass || 0,
+      goalWeight: goalData.goalWeight || 0,
+      goalBodyFat: goalData.goalBodyFat || 0,
+      goalMuscleMass: goalData.goalMuscleMass || 0,
     },
     createdAt: serverTimestamp(),
   };
 
-  addDoc(collection(db, 'generations'), dataToLog)
-    .catch(error => {
-      // Logga felet till konsolen för felsökning, men låt det inte påverka användaren.
-      console.error("Fel vid loggning av statistikhändelse till Firebase:", error);
-    });
+  addDoc(collection(db, "generations"), dataToLog).catch((error) => {
+    console.error(
+      "Fel vid loggning av statistikhändelse till Firebase:",
+      error
+    );
+  });
 };

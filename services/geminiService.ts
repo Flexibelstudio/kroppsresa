@@ -1,15 +1,8 @@
-// services/geminiService.ts
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI, Modality } from '@google/genai';
 
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY as string;
-
-if (!API_KEY) {
-  console.error(
-    "Gemini API key saknas. Kontrollera att VITE_GEMINI_API_KEY är satt i .env / Netlify."
-  );
-}
-
-const genAI = new GoogleGenerativeAI(API_KEY);
+// API-nyckeln hämtas automatiskt från AI Studio's "Secrets" (process.env.API_KEY).
+// GoogleGenAI-konstruktorn kommer att kasta ett fel om den saknas, vilket ger tydlig feedback.
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 /**
  * Tar en data-URL (t.ex. "data:image/png;base64,...") och plockar ut mimeType + base64-data.
@@ -35,9 +28,7 @@ export async function generateGoalImage(
 ): Promise<string> {
   const { mimeType, data: base64ImageData } = dataUrlToInlineData(imageDataUrl);
 
-  // Samma modellnamn som du använt tidigare
   const modelName = "gemini-2.5-flash-image";
-
   const genderEnglish = gender === "kvinna" ? "woman" : "man";
 
   let prompt: string;
@@ -90,42 +81,44 @@ ${criticalInstructions}`;
   }
 
   try {
-    const model = genAI.getGenerativeModel({
+    const response = await ai.models.generateContent({
       model: modelName,
-      generationConfig: {
-        // Viktigt: vi vill ha en bild tillbaka
-        responseModalities: ["Image"],
+      contents: {
+        parts: [
+          {
+            inlineData: {
+              data: base64ImageData,
+              mimeType: mimeType,
+            },
+          },
+          {
+            text: prompt,
+          },
+        ],
+      },
+      config: {
+        responseModalities: [Modality.IMAGE],
       },
     });
 
-    const result = await model.generateContent([
-      {
-        inlineData: {
-          data: base64ImageData,
-          mimeType,
-        },
-      },
-      { text: prompt },
-    ]);
-
-    const candidates = result.response.candidates;
-    const parts = candidates?.[0]?.content?.parts ?? [];
-    const imagePart = parts.find((part: any) => part.inlineData);
-
-    if (imagePart && imagePart.inlineData) {
-      const base64ImageBytes: string = imagePart.inlineData.data;
-      const newMimeType = imagePart.inlineData.mimeType;
-      return `data:${newMimeType};base64,${base64ImageBytes}`;
-    } else {
-      console.error("Full Gemini Response:", JSON.stringify(result, null, 2));
-      throw new Error(
-        "No image data found in the AI response. The request might have been blocked."
-      );
+    // Loopa igenom delarna i svaret för att hitta bilddatan
+    for (const part of response.candidates[0].content.parts) {
+      if (part.inlineData) {
+        const base64ImageBytes: string = part.inlineData.data;
+        const newMimeType = part.inlineData.mimeType;
+        return `data:${newMimeType};base64,${base64ImageBytes}`;
+      }
     }
-  } catch (error) {
-    console.error("Gemini API call failed:", error);
+
+    // Om ingen bild hittades i svaret
+    console.error("Fullständigt Gemini-svar:", JSON.stringify(response, null, 2));
     throw new Error(
-      "AI image generation failed. Please check the console for details."
+      "Ingen bilddata hittades i AI-svaret. Begäran kan ha blockerats."
     );
+
+  } catch (error) {
+    console.error("Anrop till Gemini API misslyckades:", error);
+    // Skicka vidare felet så att App.tsx kan hantera det och visa ett meddelande.
+    throw error;
   }
 }

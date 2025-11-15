@@ -184,8 +184,8 @@ function App() {
         );
       } else if (raw.includes("api key") || raw.includes("unauthorized") || raw.includes("401")) {
         setError(
-          "Det verkar vara ett problem med AI-nyckeln (API key) mot Gemini. " +
-          "Kontrollera att VITE_GEMINI_API_KEY är korrekt satt och att projektet har behörighet."
+          "Det verkar vara ett problem med AI-nyckeln (API key). " +
+          "Kontrollera att den är korrekt inställd i 'Secrets'-panelen och att den är giltig."
         );
       } else if (raw.includes("network") || raw.includes("failed to fetch")) {
         setError(
